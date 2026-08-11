@@ -320,25 +320,28 @@ app.get('/api/zoom/historial-docente', async (req, res) => {
 });
 
 // ==========================================
-// CACHÉ DE PROFESORES DE CANVAS
+// DATOS DE CANVAS (docente, inscritos, estado de publicación)
 // ==========================================
-// Evita llamar Canvas repetidamente para el mismo shortname
-const canvasTeacherCache = new Map(); // shortname → { name, email, avatarUrl, cachedAt }
-const CANVAS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
+// Sin caché: se consulta Canvas en vivo en cada request para que los cambios
+// (publicar/despublicar, matricular/desmatricular) se reflejen de inmediato al recargar.
+
+// Traduce el workflow_state real de Canvas (campo base, sin include[] especial) a las
+// etiquetas que usa el dashboard
+function mapWorkflowStateToEstado(workflowState) {
+    switch (workflowState) {
+        case 'available': return 'Publicado';
+        case 'completed': return 'Publicado';
+        case 'unpublished': return 'Creado';
+        case 'deleted': return 'Eliminado';
+        default: return null;
+    }
+}
 
 // Endpoint: obtener el profesor de Canvas para un shortname (SIS Course ID)
 // Ejemplo: GET /api/canvas/teacher?shortname=P202608PL0101CU130&plataforma=AP
 app.get('/api/canvas/teacher', async (req, res) => {
     const { shortname, plataforma } = req.query;
     if (!shortname) return res.status(400).json({ error: 'shortname requerido' });
-
-    // Verificar caché
-    if (canvasTeacherCache.has(shortname)) {
-        const cached = canvasTeacherCache.get(shortname);
-        if (Date.now() - cached.cachedAt < CANVAS_CACHE_TTL_MS) {
-            return res.json(cached);
-        }
-    }
 
     const isAP = (plataforma === 'AP') || (plataforma !== 'USMP');
     const domain  = isAP ? 'https://usmp.instructure.com' : 'https://usmpvirtual.instructure.com';
@@ -369,16 +372,19 @@ app.get('/api/canvas/teacher', async (req, res) => {
         ]);
 
         let totalStudents = null;
+        let estadoPlataforma = null;
         if (courseRes.ok) {
             const courseData = await courseRes.json();
             totalStudents = typeof courseData.total_students === 'number' ? courseData.total_students : null;
+            // workflow_state es un campo base de Canvas (sin include[] especial) — refleja el
+            // estado real de publicación, a diferencia del campo de SIGAV que puede quedar desfasado.
+            estadoPlataforma = mapWorkflowStateToEstado(courseData.workflow_state);
         }
 
         if (!enrollmentsRes.ok) {
             // 404 = curso no existe en Canvas todavía, no es error crítico
             if (enrollmentsRes.status === 404) {
-                const result = { name: null, email: null, totalStudents, source: 'not-found-in-canvas' };
-                canvasTeacherCache.set(shortname, { ...result, cachedAt: Date.now() });
+                const result = { name: null, email: null, totalStudents, estadoPlataforma, source: 'not-found-in-canvas' };
                 return res.json(result);
             }
             throw new Error(`Canvas API HTTP ${enrollmentsRes.status}`);
@@ -393,19 +399,18 @@ app.get('/api/canvas/teacher', async (req, res) => {
                 email:     teacher.user.login_id || teacher.user.email || null,
                 avatarUrl: teacher.user.avatar_url || null,
                 totalStudents,
+                estadoPlataforma,
                 source:    'canvas-api'
             };
-            canvasTeacherCache.set(shortname, { ...result, cachedAt: Date.now() });
             return res.json(result);
         }
 
-        const result = { name: null, email: null, totalStudents, source: 'no-teacher-found' };
-        canvasTeacherCache.set(shortname, { ...result, cachedAt: Date.now() });
+        const result = { name: null, email: null, totalStudents, estadoPlataforma, source: 'no-teacher-found' };
         return res.json(result);
 
     } catch (err) {
         console.error(`[Canvas] Error obteniendo profesor para ${shortname}:`, err.message);
-        return res.json({ name: null, email: null, totalStudents: null, source: 'error', error: err.message });
+        return res.json({ name: null, email: null, totalStudents: null, estadoPlataforma: null, source: 'error', error: err.message });
     }
 });
 
@@ -524,7 +529,7 @@ app.get('/api/historial', async (req, res) => {
                 LEFT JOIN av_inscripcion_gestor ig ON a.av_aul_id = ig.av_aul_id AND ig.av_ing_estado = '1'
                 LEFT JOIN av_docente d ON ig.av_doc_id = d.av_doc_id
                 LEFT JOIN av_persona p ON d.av_per_id = p.av_per_id
-                WHERE 1=1
+                WHERE a.av_aul_estado = 'A'
             `;
             const params = [];
             if (periodo) {

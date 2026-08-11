@@ -232,6 +232,7 @@
             }
         });
 
+        restoreFiltersFromStorage();
         await loadTeachers();
         await refreshReport();
 
@@ -472,6 +473,40 @@
         return resultados.filter(Boolean);
     }
 
+    // Construye el badge de estado de plataforma (Publicado/Creado/etc.)
+    function buildStateBadgeHtml(estado) {
+        if (estado === 'Publicado') {
+            return `<span class="badge badge-puntual"><i class="fa-solid fa-circle-check"></i> Publicado</span>`;
+        } else if (estado === 'Creado') {
+            return `<span class="badge badge-tardanza"><i class="fa-solid fa-circle-info"></i> Creado</span>`;
+        }
+        return `<span class="badge badge-falto"><i class="fa-solid fa-circle-xmark"></i> ${estado}</span>`;
+    }
+
+    // Persistencia de filtros (Periodo, Plataforma, Docente) para que sobrevivan a un F5
+    const FILTER_STORAGE_KEY = 'sigav_filtros';
+
+    function saveFiltersToStorage(periodo, plataforma, docenteText) {
+        try {
+            localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ periodo, plataforma, docenteText }));
+        } catch (e) { /* localStorage no disponible, no es crítico */ }
+    }
+
+    function restoreFiltersFromStorage() {
+        try {
+            const raw = localStorage.getItem(FILTER_STORAGE_KEY);
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            if (saved.periodo) document.getElementById('filter_periodo').value = saved.periodo;
+            if (saved.plataforma) document.getElementById('filter_plataforma').value = saved.plataforma;
+            if (saved.docenteText) document.getElementById('filter_docente').value = saved.docenteText;
+        } catch (e) { /* ignorar datos corruptos */ }
+    }
+
+    function clearFiltersFromStorage() {
+        try { localStorage.removeItem(FILTER_STORAGE_KEY); } catch (e) {}
+    }
+
     async function refreshReport() {
         const docText = document.getElementById('filter_docente').value;
         const docResolved = resolveDocenteIdFromText(docText);
@@ -481,6 +516,8 @@
 
         const perVal = document.getElementById('filter_periodo').value;
         const plaVal = document.getElementById('filter_plataforma').value;
+
+        saveFiltersToStorage(perVal, plaVal, docText);
 
         // Si los filtros obligatorios están vacíos, no buscar
         if (!perVal && !plaVal && !docVal) {
@@ -577,15 +614,8 @@
                 const canvasAdminDomain = isAP ? 'https://usmp.instructure.com' : 'https://usmpvirtual.instructure.com';
                 const administrarUrl = `${canvasAdminDomain}/accounts/1?search_term=${encodeURIComponent(shortname)}`;
 
-                // Badge de estado Canvas
-                let stateBadgeHtml = '';
-                if (row.estado_canvas === 'Publicado') {
-                    stateBadgeHtml = `<span class="badge badge-puntual"><i class="fa-solid fa-circle-check"></i> Publicado</span>`;
-                } else if (row.estado_canvas === 'Creado') {
-                    stateBadgeHtml = `<span class="badge badge-tardanza"><i class="fa-solid fa-circle-info"></i> Creado</span>`;
-                } else {
-                    stateBadgeHtml = `<span class="badge badge-falto"><i class="fa-solid fa-circle-xmark"></i> ${row.estado_canvas}</span>`;
-                }
+                // Badge de estado (valor de SIGAV como fallback mientras carga Canvas)
+                const stateBadgeHtml = buildStateBadgeHtml(row.estado_canvas);
 
                 // Opciones/Acciones
                 let optionsHtml = `
@@ -609,6 +639,7 @@
                 // IDs únicos de celdas para actualizarlas desde Canvas
                 const teacherCellId = `teacher-cell-${row.av_aul_id}-${idx}`;
                 const inscritosCellId = `inscritos-cell-${row.av_aul_id}-${idx}`;
+                const estadoCellId = `estado-cell-${row.av_aul_id}-${idx}`;
 
                 // Valor inicial de SIGAV como fallback mientras carga Canvas
                 const sigavDocente = row.docente_completo && row.docente_completo !== 'Sin Docente'
@@ -630,7 +661,7 @@
                     <td data-label="Mín."><span style="color:#000;font-weight:500;">${row.av_aul_alum_min ?? '0'}</span></td>
                     <td data-label="Máx."><span style="color:#000;font-weight:500;">${row.av_aul_alum_max ?? '0'}</span></td>
                     <td data-label="Inscritos" id="${inscritosCellId}"><span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span></td>
-                    <td data-label="Estado">${stateBadgeHtml}</td>
+                    <td data-label="Estado" id="${estadoCellId}">${stateBadgeHtml}</td>
                     <td data-label="Opciones">${optionsHtml}</td>
                 `;
 
@@ -645,34 +676,47 @@
             });
 
             // === CARGA PARALELA DE PROFESORES DESDE CANVAS ===
-            // Se lanza DESPUÉS de que la tabla ya se ve completa — no bloquea nada
-            rows.forEach((row, idx) => {
+            // Se lanza DESPUÉS de que la tabla ya se ve completa — no bloquea el primer render.
+            // Al terminar, recalcula los KPIs (Publicados, Total Inscritos, Promedio Alum) con
+            // los datos reales de Canvas en vez de los valores de SIGAV, que pueden estar desfasados.
+            const liveResults = await Promise.all(rows.map(async (row, idx) => {
                 const shortname = row.av_aul_nombre_corto || row.av_aul_codigo || '';
-                if (!shortname) return;
+                let liveInscritos = row.inscritos_canvas || 0;
+                let livePublicado = row.estado_canvas === 'Publicado';
+                if (!shortname) return { inscritos: liveInscritos, publicado: livePublicado };
 
                 const teacherCellId = `teacher-cell-${row.av_aul_id}-${idx}`;
                 const monitoreoBtnId = `monitoreo-btn-${row.av_aul_id}-${idx}`;
                 const inscritosCellId = `inscritos-cell-${row.av_aul_id}-${idx}`;
+                const estadoCellId = `estado-cell-${row.av_aul_id}-${idx}`;
                 const sigavFallback = row.docente_completo && row.docente_completo !== 'Sin Docente'
                     ? row.docente_completo : null;
 
-                fetch(`/api/canvas/teacher?shortname=${encodeURIComponent(shortname)}&plataforma=${plataformaSeleccionada}`)
-                    .then(r => r.ok ? r.json() : null)
-                    .then(data => {
-                        // Actualizar Inscritos con el conteo real de Canvas — el de SIGAV
-                        // (av_cant_inscripciones) puede estar desactualizado, sobre todo en USMP.
-                        const inscritosCell = document.getElementById(inscritosCellId);
-                        if (inscritosCell) {
-                            if (data && typeof data.totalStudents === 'number') {
-                                inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${data.totalStudents}</span><div style="font-size:0.6rem;color:#10b981;margin-top:1px;"><i class="fa-solid fa-circle-check"></i> Canvas</div>`;
-                            } else {
-                                inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span><div style="font-size:0.6rem;color:#f59e0b;margin-top:1px;"><i class="fa-solid fa-triangle-exclamation"></i> Solo SIGAV</div>`;
-                            }
-                        }
+                try {
+                    const res = await fetch(`/api/canvas/teacher?shortname=${encodeURIComponent(shortname)}&plataforma=${plataformaSeleccionada}`);
+                    const data = res.ok ? await res.json() : null;
 
-                        const cell = document.getElementById(teacherCellId);
-                        if (!cell) return;
+                    // Actualizar Inscritos con el conteo real de Canvas — el de SIGAV
+                    // (av_cant_inscripciones) puede estar desactualizado, sobre todo en USMP.
+                    const inscritosCell = document.getElementById(inscritosCellId);
+                    if (data && typeof data.totalStudents === 'number') {
+                        liveInscritos = data.totalStudents;
+                        if (inscritosCell) inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${data.totalStudents}</span><div style="font-size:0.6rem;color:#10b981;margin-top:1px;"><i class="fa-solid fa-circle-check"></i> Canvas</div>`;
+                    } else if (inscritosCell) {
+                        inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span><div style="font-size:0.6rem;color:#f59e0b;margin-top:1px;"><i class="fa-solid fa-triangle-exclamation"></i> Solo SIGAV</div>`;
+                    }
 
+                    // Actualizar Estado con el workflow_state real de Canvas — el de SIGAV
+                    // (av_aul_estado_plataforma) puede quedar desfasado si alguien publica/
+                    // despublica el curso directo en Canvas.
+                    const estadoCell = document.getElementById(estadoCellId);
+                    if (data && data.estadoPlataforma) {
+                        livePublicado = data.estadoPlataforma === 'Publicado';
+                        if (estadoCell) estadoCell.innerHTML = buildStateBadgeHtml(data.estadoPlataforma);
+                    }
+
+                    const cell = document.getElementById(teacherCellId);
+                    if (cell) {
                         if (data && data.name && data.source === 'canvas-api') {
                             // ✅ Profesor encontrado en Canvas
                             cell.innerHTML = `
@@ -703,18 +747,30 @@
                             // ❌ Sin datos ni en Canvas ni en SIGAV
                             cell.innerHTML = `<div style="font-size:0.8rem;color:var(--text-secondary);font-style:italic;">Sin docente asignado</div>`;
                         }
-                    })
-                    .catch(() => {
-                        const cell = document.getElementById(teacherCellId);
-                        if (cell && sigavFallback) {
-                            cell.innerHTML = `<div style="font-weight:600;color:#000;">${sigavFallback}</div>`;
-                        }
-                        const inscritosCell = document.getElementById(inscritosCellId);
-                        if (inscritosCell) {
-                            inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span>`;
-                        }
-                    });
-            });
+                    }
+                } catch (err) {
+                    const cell = document.getElementById(teacherCellId);
+                    if (cell && sigavFallback) {
+                        cell.innerHTML = `<div style="font-weight:600;color:#000;">${sigavFallback}</div>`;
+                    }
+                    const inscritosCell = document.getElementById(inscritosCellId);
+                    if (inscritosCell) {
+                        inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span>`;
+                    }
+                }
+
+                return { inscritos: liveInscritos, publicado: livePublicado };
+            }));
+
+            // Recalcular los KPIs con los valores reales de Canvas (reemplaza en silencio
+            // el estimado inicial de SIGAV, sin spinner de por medio)
+            const liveTotalInscritos = liveResults.reduce((acc, r) => acc + (r.inscritos || 0), 0);
+            const livePublicadas = liveResults.filter(r => r.publicado).length;
+            const livePromedio = rows.length > 0 ? Math.round(liveTotalInscritos / rows.length) : 0;
+
+            document.getElementById('kpi_monitored').textContent = livePublicadas;
+            document.getElementById('kpi_attendance').textContent = liveTotalInscritos;
+            document.getElementById('kpi_capacity').textContent = livePromedio;
 
         } catch (err) {
             badge.className = "badge badge-falto";
@@ -730,6 +786,7 @@
         document.getElementById('filter_plataforma').value = '';
         document.getElementById('chk_zoom_license').checked = false;
         filterDocentesClientSide();
+        clearFiltersFromStorage();
         await refreshReport();
     }
 

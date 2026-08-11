@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unidad de Virtualización Academica - Monitoreo de Docente</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Shared Stylesheet -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+<div class="dashboard-container">
+    <!-- Main Header -->
+    <header class="report-header">
+        <div class="logo-section">
+            <h1><i class="fa-solid fa-graduation-cap"></i> Unidad de Virtualización Academica</h1>
+            <p>Monitoreo de Docente y Control de Aforo Síncrono (Dashboard en Vivo)</p>
+        </div>
+        <div class="header-status">
+            <span class="badge badge-connected" id="connection_status_badge">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Cargando...
+            </span>
+        </div>
+    </header>
+
+    <!-- KPI Cards Grid -->
+    <div class="kpi-grid">
+        <div class="kpi-card compliance">
+            <div class="kpi-info">
+                <h3>Aulas Virtuales</h3>
+                <div class="kpi-value" id="kpi_compliance">--</div>
+                <div class="kpi-subtext">Total aulas en Periodo</div>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+        </div>
+
+        <div class="kpi-card monitored">
+            <div class="kpi-info">
+                <h3>Publicados</h3>
+                <div class="kpi-value" id="kpi_monitored">--</div>
+                <div class="kpi-subtext">Cursos activos en Canvas</div>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        </div>
+
+        <div class="kpi-card attendance">
+            <div class="kpi-info">
+                <h3>Total Inscritos</h3>
+                <div class="kpi-value" id="kpi_attendance">--</div>
+                <div class="kpi-subtext">Matrículas reales en Canvas</div>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+        </div>
+
+        <div class="kpi-card capacity">
+            <div class="kpi-info">
+                <h3>Promedio Alum</h3>
+                <div class="kpi-value" id="kpi_capacity">--</div>
+                <div class="kpi-subtext">Alumnos por aula virtual</div>
+            </div>
+            <div class="kpi-icon"><i class="fa-solid fa-chart-simple"></i></div>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <section class="filter-panel">
+        <div class="filter-title">
+            <i class="fa-solid fa-filter"></i> Filtros Académicos
+        </div>
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label for="filter_periodo">Periodo</label>
+                <select id="filter_periodo" class="filter-control">
+                    <option value="">-- Todos --</option>
+                    <option value="202601">202601</option>
+                    <option value="202602">202602</option>
+                    <option value="202603">202603</option>
+                    <option value="202604">202604</option>
+                    <option value="202605">202605</option>
+                    <option value="202606">202606</option>
+                    <option value="202607">202607</option>
+                    <option value="202608">202608</option>
+                    <option value="202609">202609</option>
+                    <option value="202610">202610</option>
+                    <option value="202611">202611</option>
+                    <option value="202612">202612</option>
+                    <option value="202502">202502</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter_plataforma">Plataforma</label>
+                <select id="filter_plataforma" class="filter-control">
+                    <option value="">-- Todas --</option>
+                    <option value="AP">Canvas AP</option>
+                    <option value="USMP">Canvas USMP</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="filter_docente">Docente</label>
+                <div class="docente-search-wrap">
+                    <input type="text" id="filter_docente" class="filter-control" placeholder="Buscar por apellidos, nombres o correo..." autocomplete="off">
+                    <div id="filter_docente_dropdown" class="docente-dropdown"></div>
+                </div>
+                <div id="filter_docente_warning" style="display:none; font-size: 0.7rem; color: var(--danger); margin-top: 0.25rem;">Docente no encontrado, selecciona una opción de la lista.</div>
+                <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.25rem;">
+                    <input type="checkbox" id="chk_zoom_license" style="cursor: pointer; width: 14px; height: 14px;">
+                    <label for="chk_zoom_license" style="font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; margin-bottom: 0; user-select: none;">Solo con Licencia Zoom</label>
+                </div>
+            </div>
+
+            <div class="filter-actions" style="margin-left: auto; display: flex; gap: 0.5rem; align-items: flex-end;">
+                <button class="btn btn-primary" id="btn_search_filters"><i class="fa-solid fa-search"></i> Buscar</button>
+                <button class="btn btn-secondary" id="btn_clear_filters"><i class="fa-solid fa-eraser"></i> Limpiar</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Report Table -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table>
+                <colgroup>
+                    <col style="width: 19%;">
+                    <col style="width: 11%;">
+                    <col style="width: 8%;">
+                    <col style="width: 21%;">
+                    <col style="width: 5%;">
+                    <col style="width: 5%;">
+                    <col style="width: 6%;">
+                    <col style="width: 8%;">
+                    <col style="width: 17%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Aula</th>
+                        <th>Shortname</th>
+                        <th>Plataforma</th>
+                        <th>Docente Asignado</th>
+                        <th>Mín.</th>
+                        <th>Máx.</th>
+                        <th>Inscritos</th>
+                        <th>Estado</th>
+                        <th>Opciones</th>
+                    </tr>
+                </thead>
+                <tbody id="report_table_body">
+                    <!-- Cargado por Javascript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Zoom Logs -->
+<div class="modal" id="zoomLogModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-video"></i> Detalle de Asistentes en Zoom</h3>
+            <button class="close-btn" id="btn_close_modal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-meta">
+                <strong>Docente/Host:</strong> <span id="modalTeacherName">--</span><br>
+                <strong>ID de Reunión:</strong> <span id="modalMeetingId" style="font-family: monospace;">--</span>
+            </div>
+            <div class="participants-list" id="modalParticipantsList">
+                <!-- Se poblará vía JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Monitoreo de Clase (Historial de reuniones Zoom del docente) -->
+<div class="modal" id="monitoreoClaseModal">
+    <div class="modal-content modal-content-wide">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-chalkboard-user"></i> Monitoreo de Clase</h3>
+            <button class="close-btn" id="btn_close_monitoreo_modal"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="monitoreo-search-row">
+                <div class="filter-group" style="flex: 1;">
+                    <label for="monitoreo_docente_input">Docente</label>
+                    <div class="docente-search-wrap">
+                        <input type="text" id="monitoreo_docente_input" class="filter-control" placeholder="Buscar por apellidos, nombres o correo..." autocomplete="off">
+                        <div id="monitoreo_docente_dropdown" class="docente-dropdown"></div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="btn_buscar_monitoreo"><i class="fa-solid fa-search"></i> Buscar</button>
+            </div>
+            <div class="monitoreo-info-banner">
+                <i class="fa-solid fa-circle-info"></i> Se muestran todas las reuniones Zoom del docente en los últimos 6 meses (no filtradas por curso específico).
+            </div>
+            <div id="monitoreoResultsContainer" class="monitoreo-results">
+                <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">Selecciona un docente para ver su historial de clases.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+    let docentesListCache = []; // usado para buscar docentes en el filtro principal y en el modal de Monitoreo de Clase
+    let filterDocenteAutocomplete;
+    let monitoreoDocenteAutocomplete;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Buscador dinámico del filtro principal — respeta el checkbox "Solo con Licencia Zoom"
+        filterDocenteAutocomplete = setupDocenteAutocomplete({
+            inputId: 'filter_docente',
+            dropdownId: 'filter_docente_dropdown',
+            respectLicenseCheckbox: true,
+            onSelect: () => {
+                document.getElementById('filter_docente_warning').style.display = 'none';
+            }
+        });
+
+        // Buscador dinámico del modal de Monitoreo de Clase — al elegir un docente, busca de inmediato
+        monitoreoDocenteAutocomplete = setupDocenteAutocomplete({
+            inputId: 'monitoreo_docente_input',
+            dropdownId: 'monitoreo_docente_dropdown',
+            onSelect: (d) => {
+                if (d.av_doc_email) fetchMonitoreoDocente(d.av_doc_email);
+            }
+        });
+
+        await loadTeachers();
+        await refreshReport();
+
+        // Listener para filtrado de licencias Zoom
+        document.getElementById('chk_zoom_license').addEventListener('change', filterDocentesClientSide);
+
+        // Listeners de búsqueda
+        document.getElementById('btn_search_filters').addEventListener('click', refreshReport);
+        document.getElementById('btn_clear_filters').addEventListener('click', clearFilters);
+        document.getElementById('btn_close_modal').addEventListener('click', closeModal);
+        document.getElementById('btn_close_monitoreo_modal').addEventListener('click', closeMonitoreoModal);
+        document.getElementById('btn_buscar_monitoreo').addEventListener('click', buscarDocenteMonitoreo);
+    });
+
+    // Normaliza un nombre para comparar (sin tildes, sin espacios extra, en mayúsculas)
+    function normalizeNamePart(s) {
+        return (s || '')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .trim().toUpperCase().replace(/\s+/g, ' ');
+    }
+
+    // Puntaje para decidir qué registro conservar cuando un docente aparece duplicado
+    // (mismo docente con cuentas distintas en Canvas AP/USMP)
+    function docenteRank(d) {
+        return (d.has_zoom_license ? 2 : 0) + (d.av_doc_email ? 1 : 0);
+    }
+
+    // Colapsa docentes duplicados (misma persona, distinto av_doc_id) comparando
+    // apellidos + primer nombre. Se queda con el registro más útil de cada grupo.
+    function dedupeDocentes(docentes) {
+        const groups = new Map();
+        docentes.forEach(d => {
+            const apellidos = normalizeNamePart(d.av_doc_apellidos);
+            const primerNombre = normalizeNamePart(d.av_doc_nombres).split(' ')[0] || '';
+            const key = `${apellidos}|${primerNombre}`;
+            const existing = groups.get(key);
+            if (!existing || docenteRank(d) > docenteRank(existing)) {
+                groups.set(key, d);
+            }
+        });
+        return Array.from(groups.values());
+    }
+
+    // Cargar docentes (cruzando licencias de Zoom) — la lista se usa en vivo por los buscadores dinámicos
+    async function loadTeachers() {
+        const badge = document.getElementById('connection_status_badge');
+        try {
+            const docRes = await fetch('/api/docentes');
+            const rawDocentes = await docRes.json();
+            docentesListCache = dedupeDocentes(rawDocentes);
+
+            // Actualizar status badge
+            if (badge) {
+                badge.className = "badge badge-connected";
+                badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> BD Conectada';
+            }
+        } catch (err) {
+            console.error('Error cargando docentes', err);
+            if (badge) {
+                badge.className = "badge badge-falto";
+                badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Error de Conexión';
+            }
+        }
+    }
+
+    // Buscador dinámico de docentes: dropdown propio con filtrado en vivo y
+    // un punto celeste para diferenciar a quienes tienen licencia Zoom activa.
+    function setupDocenteAutocomplete({ inputId, dropdownId, respectLicenseCheckbox = false, onSelect }) {
+        const input = document.getElementById(inputId);
+        const dropdown = document.getElementById(dropdownId);
+        let currentMatches = [];
+        let activeIndex = -1;
+
+        function getMatches(query) {
+            const onlyLicensed = respectLicenseCheckbox && document.getElementById('chk_zoom_license')?.checked;
+            const q = query.trim().toLowerCase();
+
+            return docentesListCache.filter(d => {
+                if (onlyLicensed && !d.has_zoom_license) return false;
+                if (!q) return true;
+                const full = `${d.av_doc_apellidos}, ${d.av_doc_nombres}`.toLowerCase();
+                const email = (d.av_doc_email || '').toLowerCase();
+                const username = (d.av_doc_username || '').toLowerCase();
+                return full.includes(q) || email.includes(q) || username.includes(q);
+            }); // sin límite — el dropdown es scrolleable, cortar la lista dejaba fuera docentes de la Z en adelante
+        }
+
+        function render(query) {
+            currentMatches = getMatches(query);
+            activeIndex = -1;
+
+            if (currentMatches.length === 0) {
+                dropdown.innerHTML = `<div class="docente-dropdown-empty">Sin coincidencias</div>`;
+            } else {
+                dropdown.innerHTML = currentMatches.map((d, i) => `
+                    <div class="docente-dropdown-item" data-index="${i}">
+                        <span class="zoom-dot ${d.has_zoom_license ? 'zoom-dot-active' : ''}" title="${d.has_zoom_license ? 'Con licencia Zoom' : 'Sin licencia Zoom'}"></span>
+                        <div class="docente-dropdown-info">
+                            <span class="docente-dropdown-name">${d.av_doc_apellidos}, ${d.av_doc_nombres}</span>
+                            <span class="docente-dropdown-email">${d.av_doc_email || ''}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            dropdown.classList.add('active');
+        }
+
+        function highlight() {
+            dropdown.querySelectorAll('.docente-dropdown-item').forEach((el, i) => {
+                el.classList.toggle('active', i === activeIndex);
+                if (i === activeIndex) el.scrollIntoView({ block: 'nearest' });
+            });
+        }
+
+        function select(idx) {
+            const d = currentMatches[idx];
+            if (!d) return;
+            input.value = `${d.av_doc_apellidos}, ${d.av_doc_nombres}`;
+            dropdown.classList.remove('active');
+            if (onSelect) onSelect(d);
+        }
+
+        input.addEventListener('input', () => render(input.value));
+        input.addEventListener('focus', () => render(input.value));
+
+        input.addEventListener('keydown', (e) => {
+            if (!dropdown.classList.contains('active')) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = Math.min(activeIndex + 1, currentMatches.length - 1);
+                highlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIndex = Math.max(activeIndex - 1, 0);
+                highlight();
+            } else if (e.key === 'Enter') {
+                if (activeIndex >= 0) {
+                    e.preventDefault();
+                    select(activeIndex);
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        dropdown.addEventListener('mousedown', (e) => {
+            const item = e.target.closest('.docente-dropdown-item');
+            if (!item) return;
+            e.preventDefault(); // evita que el input pierda foco antes del click
+            select(parseInt(item.dataset.index, 10));
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target !== input && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        return {
+            rerenderIfOpen: () => {
+                if (dropdown.classList.contains('active')) render(input.value);
+            }
+        };
+    }
+
+    // Filtrado client-side de docentes (checkbox Solo con Licencia Zoom)
+    function filterDocentesClientSide() {
+        if (filterDocenteAutocomplete) filterDocenteAutocomplete.rerenderIfOpen();
+    }
+
+    // Resuelve el texto escrito en el buscador de docente (nombre o correo) a un av_doc_id
+    function resolveDocenteIdFromText(text) {
+        const clean = text.trim().toLowerCase();
+        if (!clean) return { id: '', matched: true };
+
+        if (clean.includes('@')) {
+            const match = docentesListCache.find(d => (d.av_doc_email || '').toLowerCase() === clean);
+            return match ? { id: match.av_doc_id, matched: true } : { id: null, matched: false };
+        }
+
+        const match = docentesListCache.find(d =>
+            `${d.av_doc_apellidos}, ${d.av_doc_nombres}`.trim().toLowerCase() === clean
+            || (d.av_doc_username || '').toLowerCase() === clean
+        );
+        return match ? { id: match.av_doc_id, matched: true } : { id: null, matched: false };
+    }
+
+    // Compara una fila (SIGAV) contra el docente buscado.
+    // Devuelve true/false si ya se puede decidir con datos de SIGAV, o null si hace falta
+    // verificar en Canvas (aula sin docente asignado en av_inscripcion_gestor).
+    function matchDocenteEnFila(row, docenteObj) {
+        const rowNameLower = (row.docente_completo || '').toLowerCase();
+        const rowEmailLower = (row.av_doc_correo || '').toLowerCase();
+        const apellidosLower = (docenteObj.av_doc_apellidos || '').toLowerCase();
+        const emailLower = (docenteObj.av_doc_email || '').toLowerCase();
+
+        if (rowNameLower === 'sin docente' || !rowNameLower) return null;
+
+        if (apellidosLower && rowNameLower.includes(apellidosLower)) return true;
+        if (emailLower && rowEmailLower && rowEmailLower === emailLower) return true;
+        return false;
+    }
+
+    // Verifica en Canvas si el docente real de esa aula coincide con el buscado
+    // (para aulas sin asignación en SIGAV)
+    async function matchDocenteEnCanvas(row, docenteObj, plataforma) {
+        const shortname = row.av_aul_nombre_corto || row.av_aul_codigo || '';
+        if (!shortname) return false;
+        try {
+            const res = await fetch(`/api/canvas/teacher?shortname=${encodeURIComponent(shortname)}&plataforma=${plataforma}`);
+            if (!res.ok) return false;
+            const data = await res.json();
+            if (!data || !data.name) return false;
+
+            const nameLower = data.name.toLowerCase();
+            const emailLower = (data.email || '').toLowerCase();
+            const apellidosLower = (docenteObj.av_doc_apellidos || '').toLowerCase();
+            const docenteEmailLower = (docenteObj.av_doc_email || '').toLowerCase();
+
+            if (apellidosLower && nameLower.includes(apellidosLower)) return true;
+            if (docenteEmailLower && emailLower && emailLower === docenteEmailLower) return true;
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
+    // Filtra las aulas por docente cruzando SIGAV y Canvas — necesario porque muchos
+    // docentes solo existen en Canvas (SIGAV no los tiene asignados en av_inscripcion_gestor)
+    async function filtrarPorDocente(rows, docenteObj, plataforma) {
+        const resultados = await Promise.all(rows.map(async row => {
+            const sigavMatch = matchDocenteEnFila(row, docenteObj);
+            if (sigavMatch === true) return row;
+            if (sigavMatch === false) return null;
+            const canvasMatch = await matchDocenteEnCanvas(row, docenteObj, plataforma);
+            return canvasMatch ? row : null;
+        }));
+        return resultados.filter(Boolean);
+    }
+
+    async function refreshReport() {
+        const docText = document.getElementById('filter_docente').value;
+        const docResolved = resolveDocenteIdFromText(docText);
+        const docWarning = document.getElementById('filter_docente_warning');
+        if (docWarning) docWarning.style.display = (docText.trim() && !docResolved.matched) ? 'block' : 'none';
+        const docVal = docResolved.matched ? docResolved.id : '';
+
+        const perVal = document.getElementById('filter_periodo').value;
+        const plaVal = document.getElementById('filter_plataforma').value;
+
+        // Si los filtros obligatorios están vacíos, no buscar
+        if (!perVal && !plaVal && !docVal) {
+            const tbody = document.getElementById('report_table_body');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <p>Selecciona un periodo y plataforma para auditar las aulas virtuales.</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // NOTA: el docente ya NO se manda al backend — se trae todo el periodo/plataforma
+        // y se filtra en el cliente cruzando SIGAV + Canvas (ver filtrarPorDocente)
+        const queryParams = new URLSearchParams();
+        if (perVal) queryParams.append('periodo', perVal);
+        if (plaVal) queryParams.append('plataforma', plaVal);
+
+        const badge = document.getElementById('connection_status_badge');
+
+        try {
+            badge.className = "badge badge-loading";
+            badge.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Cargando...';
+
+            const res = await fetch(`/api/historial?${queryParams.toString()}`);
+            if (!res.ok) throw new Error("API respondio con error");
+            const result = await res.json();
+
+            // Detectar plataforma seleccionada para llamadas a Canvas
+            const plataformaSeleccionada = document.getElementById('filter_plataforma').value || 'AP';
+
+            let rows = result.data;
+            let kpis = result.kpis;
+
+            // Si hay un docente buscado, filtrar en el cliente (cruzando SIGAV y Canvas).
+            // Muchos docentes solo existen en Canvas y no tienen asignación en SIGAV
+            // (av_inscripcion_gestor), así que un filtro solo por SQL los deja fuera.
+            if (docResolved.matched && docResolved.id) {
+                const docenteObj = docentesListCache.find(d => d.av_doc_id === docResolved.id);
+                if (docenteObj) {
+                    rows = await filtrarPorDocente(rows, docenteObj, plataformaSeleccionada);
+                    const totalInscritos = rows.reduce((acc, r) => acc + (r.inscritos_canvas || 0), 0);
+                    kpis = {
+                        total_aulas: rows.length,
+                        total_publicadas: rows.filter(r => r.estado_canvas === 'Publicado').length,
+                        total_inscritos: totalInscritos,
+                        promedio_alumnos: rows.length ? Math.round(totalInscritos / rows.length) : 0
+                    };
+                }
+            }
+
+            // Actualizar Estado de Conexión
+            badge.className = "badge badge-connected";
+            badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Datos de SIGAV';
+
+            // Actualizar KPIs
+            document.getElementById('kpi_compliance').textContent = kpis.total_aulas;
+            document.getElementById('kpi_monitored').textContent = kpis.total_publicadas;
+            document.getElementById('kpi_attendance').textContent = kpis.total_inscritos;
+            document.getElementById('kpi_capacity').textContent = kpis.promedio_alumnos;
+
+            // Renderizar tabla
+            const tbody = document.getElementById('report_table_body');
+            tbody.innerHTML = '';
+
+            if (rows.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9">
+                            <div class="empty-state">
+                                <i class="fa-regular fa-folder-open"></i>
+                                <p>No se encontraron aulas virtuales registradas en la base de datos para este periodo y plataforma.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            rows.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                const shortname = row.av_aul_nombre_corto || row.av_aul_codigo || '';
+
+                // Badge de plataforma
+                const isAP = row.plataforma_label === 'CANVAS - AP';
+                const platBadgeClass = isAP ? 'badge-puntual' : 'badge-tardanza';
+
+                // URL de administración en Canvas (dominio según plataforma, búsqueda por shortname del aula/periodo)
+                const canvasAdminDomain = isAP ? 'https://usmp.instructure.com' : 'https://usmpvirtual.instructure.com';
+                const administrarUrl = `${canvasAdminDomain}/accounts/1?search_term=${encodeURIComponent(shortname)}`;
+
+                // Badge de estado Canvas
+                let stateBadgeHtml = '';
+                if (row.estado_canvas === 'Publicado') {
+                    stateBadgeHtml = `<span class="badge badge-puntual"><i class="fa-solid fa-circle-check"></i> Publicado</span>`;
+                } else if (row.estado_canvas === 'Creado') {
+                    stateBadgeHtml = `<span class="badge badge-tardanza"><i class="fa-solid fa-circle-info"></i> Creado</span>`;
+                } else {
+                    stateBadgeHtml = `<span class="badge badge-falto"><i class="fa-solid fa-circle-xmark"></i> ${row.estado_canvas}</span>`;
+                }
+
+                // Opciones/Acciones
+                let optionsHtml = `
+                    <div class="options-stack">
+                        <a href="${administrarUrl}" target="_blank" class="btn btn-secondary">
+                            <i class="fa-solid fa-gear"></i> Administrar
+                        </a>
+                        <button id="monitoreo-btn-${row.av_aul_id}-${idx}" class="btn btn-secondary btn-monitoreo-clase" data-email="${row.av_doc_correo || ''}" data-nombre="${row.docente_completo || ''}">
+                            <i class="fa-solid fa-video"></i> Monitoreo de Clase
+                        </button>
+                `;
+                if (row.zoom_meeting_id) {
+                    optionsHtml += `
+                        <button class="btn btn-primary" onclick="viewZoomLog('${row.zoom_meeting_id}', '${row.docente_completo}')">
+                            <i class="fa-solid fa-magnifying-glass"></i> Zoom Log
+                        </button>
+                    `;
+                }
+                optionsHtml += '</div>';
+
+                // IDs únicos de celdas para actualizarlas desde Canvas
+                const teacherCellId = `teacher-cell-${row.av_aul_id}-${idx}`;
+                const inscritosCellId = `inscritos-cell-${row.av_aul_id}-${idx}`;
+
+                // Valor inicial de SIGAV como fallback mientras carga Canvas
+                const sigavDocente = row.docente_completo && row.docente_completo !== 'Sin Docente'
+                    ? `<div style="font-weight:600;color:#000;">${row.docente_completo}</div>
+                       ${row.av_doc_correo ? `<div style="font-size:0.75rem;color:var(--text-secondary);">${row.av_doc_correo}</div>` : ''}`
+                    : `<div style="font-size:0.8rem;color:var(--text-secondary);font-style:italic;">Sin asignar en SIGAV</div>`;
+
+                tr.innerHTML = `
+                    <td>
+                        <a href="https://www.aulavirtualusmp.pe/sigav/mantenimiento/aula#collapse_aula_${row.av_aul_id}" target="_blank" style="color: var(--primary); font-weight: 600; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--primary-hover)'" onmouseout="this.style.color='var(--primary)'">
+                            ${row.av_aul_nombre || row.av_aul_descripcion}
+                        </a>
+                    </td>
+                    <td><span style="font-weight:600;color:#000;font-family:monospace;font-size:0.7rem;word-break:break-all;">${shortname}</span></td>
+                    <td><span class="badge ${platBadgeClass}">${row.plataforma_label}</span></td>
+                    <td id="${teacherCellId}">
+                        ${sigavDocente}
+                    </td>
+                    <td><span style="color:#000;font-weight:500;">${row.av_aul_alum_min ?? '0'}</span></td>
+                    <td><span style="color:#000;font-weight:500;">${row.av_aul_alum_max ?? '0'}</span></td>
+                    <td id="${inscritosCellId}"><span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span></td>
+                    <td>${stateBadgeHtml}</td>
+                    <td>${optionsHtml}</td>
+                `;
+
+                tbody.appendChild(tr);
+
+                const btnMonitoreo = tr.querySelector('.btn-monitoreo-clase');
+                if (btnMonitoreo) {
+                    btnMonitoreo.addEventListener('click', () => {
+                        viewMonitoreoClase(btnMonitoreo.dataset.email, btnMonitoreo.dataset.nombre);
+                    });
+                }
+            });
+
+            // === CARGA PARALELA DE PROFESORES DESDE CANVAS ===
+            // Se lanza DESPUÉS de que la tabla ya se ve completa — no bloquea nada
+            rows.forEach((row, idx) => {
+                const shortname = row.av_aul_nombre_corto || row.av_aul_codigo || '';
+                if (!shortname) return;
+
+                const teacherCellId = `teacher-cell-${row.av_aul_id}-${idx}`;
+                const monitoreoBtnId = `monitoreo-btn-${row.av_aul_id}-${idx}`;
+                const inscritosCellId = `inscritos-cell-${row.av_aul_id}-${idx}`;
+                const sigavFallback = row.docente_completo && row.docente_completo !== 'Sin Docente'
+                    ? row.docente_completo : null;
+
+                fetch(`/api/canvas/teacher?shortname=${encodeURIComponent(shortname)}&plataforma=${plataformaSeleccionada}`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => {
+                        // Actualizar Inscritos con el conteo real de Canvas — el de SIGAV
+                        // (av_cant_inscripciones) puede estar desactualizado, sobre todo en USMP.
+                        const inscritosCell = document.getElementById(inscritosCellId);
+                        if (inscritosCell) {
+                            if (data && typeof data.totalStudents === 'number') {
+                                inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${data.totalStudents}</span><div style="font-size:0.6rem;color:#10b981;margin-top:1px;"><i class="fa-solid fa-circle-check"></i> Canvas</div>`;
+                            } else {
+                                inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span><div style="font-size:0.6rem;color:#f59e0b;margin-top:1px;"><i class="fa-solid fa-triangle-exclamation"></i> Solo SIGAV</div>`;
+                            }
+                        }
+
+                        const cell = document.getElementById(teacherCellId);
+                        if (!cell) return;
+
+                        if (data && data.name && data.source === 'canvas-api') {
+                            // ✅ Profesor encontrado en Canvas
+                            cell.innerHTML = `
+                                <div style="font-weight:700;color:#000;">
+                                    <i class="fa-solid fa-chalkboard-user" style="color:var(--primary);margin-right:4px;font-size:0.75rem;"></i>${data.name}
+                                </div>
+                                ${data.email ? `<div style="font-size:0.72rem;color:var(--text-secondary);">${data.email}</div>` : ''}
+                                <div style="font-size:0.65rem;color:#10b981;margin-top:1px;"><i class="fa-solid fa-circle-check"></i> Canvas</div>
+                            `;
+
+                            // El correo verificado en Canvas es más confiable que el de SIGAV para
+                            // encontrar al host real en Zoom — se usa siempre que esté disponible.
+                            if (data.email) {
+                                const btn = document.getElementById(monitoreoBtnId);
+                                if (btn) {
+                                    btn.dataset.email = data.email;
+                                    btn.dataset.nombre = data.name;
+                                }
+                            }
+                        } else if (sigavFallback) {
+                            // ⚠️ No encontrado en Canvas, mostrar dato de SIGAV
+                            cell.innerHTML = `
+                                <div style="font-weight:600;color:#000;">${sigavFallback}</div>
+                                ${row.av_doc_correo ? `<div style="font-size:0.72rem;color:var(--text-secondary);">${row.av_doc_correo}</div>` : ''}
+                                <div style="font-size:0.65rem;color:#f59e0b;margin-top:1px;"><i class="fa-solid fa-triangle-exclamation"></i> Solo SIGAV</div>
+                            `;
+                        } else {
+                            // ❌ Sin datos ni en Canvas ni en SIGAV
+                            cell.innerHTML = `<div style="font-size:0.8rem;color:var(--text-secondary);font-style:italic;">Sin docente asignado</div>`;
+                        }
+                    })
+                    .catch(() => {
+                        const cell = document.getElementById(teacherCellId);
+                        if (cell && sigavFallback) {
+                            cell.innerHTML = `<div style="font-weight:600;color:#000;">${sigavFallback}</div>`;
+                        }
+                        const inscritosCell = document.getElementById(inscritosCellId);
+                        if (inscritosCell) {
+                            inscritosCell.innerHTML = `<span style="font-weight:700;color:var(--primary);">${row.inscritos_canvas}</span>`;
+                        }
+                    });
+            });
+
+        } catch (err) {
+            badge.className = "badge badge-falto";
+            badge.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Error de Conexión';
+            console.error(err);
+        }
+    }
+
+    async function clearFilters() {
+        document.getElementById('filter_docente').value = '';
+        document.getElementById('filter_docente_warning').style.display = 'none';
+        document.getElementById('filter_periodo').value = '';
+        document.getElementById('filter_plataforma').value = '';
+        document.getElementById('chk_zoom_license').checked = false;
+        filterDocentesClientSide();
+        await refreshReport();
+    }
+
+    // Modal Zoom Logs
+    function viewZoomLog(meetingId, teacherName) {
+        document.getElementById('modalMeetingId').textContent = meetingId;
+        document.getElementById('modalTeacherName').textContent = teacherName;
+        
+        const listContainer = document.getElementById('modalParticipantsList');
+        listContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Cargando participantes...</p>';
+        
+        setTimeout(() => {
+            listContainer.innerHTML = '';
+            
+            // Alumnos simulados
+            const mockStudents = [
+                { name: "Alvaro Soto Ramos", email: "alvaro.soto@usmp.pe", duration: "115 min" },
+                { name: "Beatriz Fernandez Lopez", email: "beatriz.fernandez@usmp.pe", duration: "112 min" },
+                { name: "Diego Cardenas Ruiz", email: "diego.cardenas@usmp.pe", duration: "98 min" },
+                { name: "Elena Gonzales Flores", email: "elena.gonzales@usmp.pe", duration: "119 min" },
+                { name: "Franco Melendez Tello", email: "franco.melendez@usmp.pe", duration: "85 min" },
+                { name: "Gabriela Diaz Prado", email: "gabriela.diaz@usmp.pe", duration: "110 min" }
+            ];
+
+            mockStudents.forEach(student => {
+                const item = document.createElement('div');
+                item.className = 'participant-item';
+                item.innerHTML = `
+                    <div class="p-info">
+                        <span class="p-name">${student.name}</span>
+                        <span class="p-email">${student.email}</span>
+                    </div>
+                    <span class="p-time">${student.duration}</span>
+                `;
+                listContainer.appendChild(item);
+            });
+        }, 200);
+
+        document.getElementById('zoomLogModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('zoomLogModal').classList.remove('active');
+    }
+
+    // Modal Monitoreo de Clase (historial de reuniones Zoom del docente)
+    function viewMonitoreoClase(email, nombreCompleto) {
+        const input = document.getElementById('monitoreo_docente_input');
+        input.value = (nombreCompleto && nombreCompleto !== 'Sin Docente') ? nombreCompleto : '';
+        document.getElementById('monitoreoClaseModal').classList.add('active');
+
+        if (email) {
+            fetchMonitoreoDocente(email);
+        } else {
+            document.getElementById('monitoreoResultsContainer').innerHTML = `
+                <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">
+                    Este curso no tiene un docente asignado en SIGAV. Busca uno manualmente arriba.
+                </p>`;
+        }
+    }
+
+    function buscarDocenteMonitoreo() {
+        const inputVal = document.getElementById('monitoreo_docente_input').value.trim();
+        if (!inputVal) return;
+
+        let email = null;
+        if (inputVal.includes('@')) {
+            email = inputVal;
+        } else {
+            const clean = inputVal.toLowerCase();
+            const match = docentesListCache.find(d =>
+                `${d.av_doc_apellidos}, ${d.av_doc_nombres}`.toLowerCase() === clean
+                || (d.av_doc_username || '').toLowerCase() === clean
+            );
+            email = match ? match.av_doc_email : null;
+        }
+
+        if (!email) {
+            document.getElementById('monitoreoResultsContainer').innerHTML = `
+                <p style="color: var(--danger); text-align: center; padding: 1rem;">
+                    No se encontró ese docente. Selecciona una opción de la lista o escribe su correo.
+                </p>`;
+            return;
+        }
+
+        fetchMonitoreoDocente(email);
+    }
+
+    async function fetchMonitoreoDocente(email) {
+        const container = document.getElementById('monitoreoResultsContainer');
+        container.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 1rem;"><i class="fa-solid fa-spinner fa-spin"></i> Cargando reuniones de Zoom...</p>`;
+
+        try {
+            const res = await fetch(`/api/zoom/historial-docente?email=${encodeURIComponent(email)}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                container.innerHTML = `<p style="color: var(--danger); text-align: center; padding: 1rem;">${data.error || 'Error al consultar Zoom'}</p>`;
+                return;
+            }
+
+            if (!data.meetings || data.meetings.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No se encontraron reuniones de Zoom en los últimos 6 meses para este docente.</p>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            data.meetings.forEach(m => {
+                const item = document.createElement('div');
+                item.className = 'session-item';
+                const fecha = new Date(m.start_time).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
+                item.innerHTML = `
+                    <div class="session-info">
+                        <span class="session-topic">${m.topic || 'Reunión Zoom'}</span>
+                        <span class="session-date">${fecha}</span>
+                    </div>
+                    <div class="session-stats">
+                        <span class="session-stat stat-duration"><i class="fa-solid fa-clock"></i> ${m.duration_min} min</span>
+                        <span class="session-stat stat-participants"><i class="fa-solid fa-users"></i> ${m.participants_count}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        } catch (err) {
+            container.innerHTML = `<p style="color: var(--danger); text-align: center; padding: 1rem;">Error de red al consultar Zoom.</p>`;
+        }
+    }
+
+    function closeMonitoreoModal() {
+        document.getElementById('monitoreoClaseModal').classList.remove('active');
+    }
+
+    window.onclick = function(event) {
+        const monitoreoModal = document.getElementById('monitoreoClaseModal');
+        if (event.target == monitoreoModal) {
+            closeMonitoreoModal();
+        }
+        const modal = document.getElementById('zoomLogModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+</script>
+
+</body>
+</html>

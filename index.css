@@ -774,3 +774,179 @@ tr:hover td {
     50% { border-color: rgba(239, 68, 68, 0.6); }
     100% { border-color: rgba(239, 68, 68, 0.15); }
 }
+
+/* ==========================================
+   VISTA MÓVIL
+   ========================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 1.25rem 1rem;
+    }
+
+    .dashboard-container {
+        gap: 1.25rem;
+    }
+
+    /* Header: apilado, título más chico */
+    .report-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding-bottom: 1.1rem;
+    }
+
+    .logo-section h1 {
+        font-size: 1.15rem;
+        gap: 0.5rem;
+    }
+
+    .logo-section p {
+        font-size: 0.75rem;
+    }
+
+    /* KPIs: grilla de 2 columnas, tarjetas más compactas */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .kpi-card {
+        padding: 1rem;
+    }
+
+    .kpi-info h3 {
+        font-size: 0.7rem;
+    }
+
+    .kpi-info .kpi-value {
+        font-size: 1.4rem;
+        margin-top: 0.25rem;
+    }
+
+    .kpi-info .kpi-subtext {
+        font-size: 0.7rem;
+    }
+
+    .kpi-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.1rem;
+    }
+
+    /* Filtros: todo en una sola columna, botones a lo ancho */
+    .filter-panel {
+        padding: 1.1rem;
+    }
+
+    .filter-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .filter-actions {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    .filter-actions .btn {
+        flex: 1;
+    }
+
+    .docente-dropdown {
+        max-height: min(240px, 40vh);
+    }
+
+    /* Tabla → tarjetas apiladas */
+    .table-card {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+    }
+
+    table, thead, tbody, tr, td {
+        display: block;
+        width: 100% !important;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tbody#report_table_body tr {
+        background: var(--surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: 0.85rem;
+        margin-bottom: 0.85rem;
+        box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.08);
+    }
+
+    tbody#report_table_body tr:last-child {
+        margin-bottom: 0;
+    }
+
+    tbody#report_table_body td {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+
+    tbody#report_table_body td:last-child {
+        border-bottom: none;
+    }
+
+    tbody#report_table_body td::before {
+        content: attr(data-label);
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-secondary);
+    }
+
+    /* Fila de "sin resultados" (colspan) no lleva etiqueta */
+    tbody#report_table_body td[colspan] {
+        padding: 0;
+        border-bottom: none;
+    }
+
+    tbody#report_table_body td[colspan]::before {
+        content: none;
+    }
+
+    /* Modales: ocupan casi todo el ancho, contenido más compacto */
+    .modal-content,
+    .modal-content-wide {
+        width: 94%;
+        max-width: 94%;
+    }
+
+    .modal-body {
+        padding: 1.1rem;
+    }
+
+    .modal-header {
+        padding: 1rem 1.1rem;
+    }
+
+    .monitoreo-search-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .monitoreo-search-row .btn {
+        width: 100%;
+    }
+
+    .session-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .session-stats {
+        width: 100%;
+    }
+}

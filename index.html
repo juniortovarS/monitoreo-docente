@@ -51,11 +51,11 @@
 
         <div class="kpi-card attendance">
             <div class="kpi-info">
-                <h3>Total Inscritos</h3>
-                <div class="kpi-value" id="kpi_attendance">--</div>
-                <div class="kpi-subtext">Matrículas reales en Canvas</div>
+                <h3>Aforo ≥ 50%</h3>
+                <div class="kpi-value" id="kpi_ocupacion">--</div>
+                <div class="kpi-subtext" id="kpi_ocupacion_subtext">Aulas con la mitad o más de su capacidad</div>
             </div>
-            <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+            <div class="kpi-icon"><i class="fa-solid fa-gauge-high"></i></div>
         </div>
 
         <div class="kpi-card capacity">
@@ -473,6 +473,31 @@
         return resultados.filter(Boolean);
     }
 
+    // Actualiza el KPI "Aforo ≥ 50%": % de aulas cuyos inscritos alcanzan al menos la mitad
+    // de su capacidad máxima (av_aul_alum_max)
+    function updateOcupacionKpi(rows, getInscritos) {
+        const totalAulas = rows.length;
+        const kpiEl = document.getElementById('kpi_ocupacion');
+        const subtextEl = document.getElementById('kpi_ocupacion_subtext');
+
+        if (totalAulas === 0) {
+            kpiEl.textContent = '--';
+            subtextEl.textContent = 'Aulas con la mitad o más de su capacidad';
+            return;
+        }
+
+        let countAtLeastHalf = 0;
+        rows.forEach((row, idx) => {
+            const max = row.av_aul_alum_max || 0;
+            const inscritos = getInscritos(row, idx);
+            if (max > 0 && (inscritos / max) >= 0.5) countAtLeastHalf++;
+        });
+
+        const pct = Math.round((countAtLeastHalf / totalAulas) * 100);
+        kpiEl.textContent = `${pct}%`;
+        subtextEl.textContent = `${countAtLeastHalf} de ${totalAulas} aulas`;
+    }
+
     // Construye el badge de estado de plataforma (Publicado/Creado/etc.)
     function buildStateBadgeHtml(estado) {
         if (estado === 'Publicado') {
@@ -581,8 +606,11 @@
             // Actualizar KPIs
             document.getElementById('kpi_compliance').textContent = kpis.total_aulas;
             document.getElementById('kpi_monitored').textContent = kpis.total_publicadas;
-            document.getElementById('kpi_attendance').textContent = kpis.total_inscritos;
             document.getElementById('kpi_capacity').textContent = kpis.promedio_alumnos;
+
+            // Estimado inicial de "Aforo ≥ 50%" con los inscritos de SIGAV — se afina
+            // después con el conteo verificado en Canvas (ver más abajo)
+            updateOcupacionKpi(rows, (row) => row.inscritos_canvas || 0);
 
             // Renderizar tabla
             const tbody = document.getElementById('report_table_body');
@@ -677,13 +705,14 @@
 
             // === CARGA PARALELA DE PROFESORES DESDE CANVAS ===
             // Se lanza DESPUÉS de que la tabla ya se ve completa — no bloquea el primer render.
-            // Al terminar, recalcula los KPIs (Publicados, Total Inscritos, Promedio Alum) con
+            // Al terminar, recalcula los KPIs (Publicados, Promedio Alum, Con Licencia Zoom) con
             // los datos reales de Canvas en vez de los valores de SIGAV, que pueden estar desfasados.
             const liveResults = await Promise.all(rows.map(async (row, idx) => {
                 const shortname = row.av_aul_nombre_corto || row.av_aul_codigo || '';
                 let liveInscritos = row.inscritos_canvas || 0;
                 let livePublicado = row.estado_canvas === 'Publicado';
-                if (!shortname) return { inscritos: liveInscritos, publicado: livePublicado };
+                let liveDocenteEmail = row.av_doc_correo || null;
+                if (!shortname) return { inscritos: liveInscritos, publicado: livePublicado, docenteEmail: liveDocenteEmail };
 
                 const teacherCellId = `teacher-cell-${row.av_aul_id}-${idx}`;
                 const monitoreoBtnId = `monitoreo-btn-${row.av_aul_id}-${idx}`;
@@ -730,6 +759,7 @@
                             // El correo verificado en Canvas es más confiable que el de SIGAV para
                             // encontrar al host real en Zoom — se usa siempre que esté disponible.
                             if (data.email) {
+                                liveDocenteEmail = data.email;
                                 const btn = document.getElementById(monitoreoBtnId);
                                 if (btn) {
                                     btn.dataset.email = data.email;
@@ -759,7 +789,7 @@
                     }
                 }
 
-                return { inscritos: liveInscritos, publicado: livePublicado };
+                return { inscritos: liveInscritos, publicado: livePublicado, docenteEmail: liveDocenteEmail };
             }));
 
             // Recalcular los KPIs con los valores reales de Canvas (reemplaza en silencio
@@ -769,8 +799,8 @@
             const livePromedio = rows.length > 0 ? Math.round(liveTotalInscritos / rows.length) : 0;
 
             document.getElementById('kpi_monitored').textContent = livePublicadas;
-            document.getElementById('kpi_attendance').textContent = liveTotalInscritos;
             document.getElementById('kpi_capacity').textContent = livePromedio;
+            updateOcupacionKpi(rows, (row, idx) => liveResults[idx].inscritos);
 
         } catch (err) {
             badge.className = "badge badge-falto";

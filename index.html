@@ -681,7 +681,7 @@
                             ${row.av_aul_nombre || row.av_aul_descripcion}
                         </a>
                     </td>
-                    <td data-label="Shortname"><span style="font-weight:600;color:#000;font-family:monospace;font-size:0.7rem;word-break:break-all;">${shortname}</span></td>
+                    <td data-label="Shortname"><a href="${administrarUrl}" target="_blank" style="font-weight:600;color:var(--primary);font-family:monospace;font-size:0.7rem;word-break:break-all;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${shortname}</a></td>
                     <td data-label="Plataforma"><span class="badge ${platBadgeClass}">${row.plataforma_label}</span></td>
                     <td data-label="Docente Asignado" id="${teacherCellId}">
                         ${sigavDocente}
